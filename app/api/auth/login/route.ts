@@ -13,16 +13,21 @@ export async function POST(request: Request) {
       );
     }
 
-    // Automatically seed/create default owner account on first login if table is empty
-    const userCount = await db.user.count();
-    if (userCount === 0) {
-      await db.user.create({
-        data: {
-          username: "owner",
-          password: "123",
-          role: "OWNER",
-        },
-      });
+    // Automatically create default owner account if no users exist yet
+    try {
+      const userCount = await db.user.count();
+      if (userCount === 0) {
+        await db.user.create({
+          data: {
+            username: "owner",
+            password: "123",
+            role: "OWNER",
+          },
+        });
+      }
+    } catch (e) {
+      // Table might not exist yet if db push hasn't run
+      console.log("Auto-seed skipped or not needed:", e);
     }
 
     const user = await db.user.findUnique({
@@ -43,7 +48,7 @@ export async function POST(request: Request) {
       },
       { status: 200 }
     );
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Login error:", error);
     return NextResponse.json({ error: "Login failed" }, { status: 500 });
   }
