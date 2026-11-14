@@ -2,6 +2,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
+interface CartItem {
+  productId: string;
+  quantity: number;
+  costPrice?: number;
+  sellingPrice: number;
+}
+
 // GET: Fetch all past sales
 export async function GET() {
   try {
@@ -13,7 +20,7 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json(sales, { status: 200 });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error fetching sales:", error);
     return NextResponse.json({ error: "Failed to fetch sales" }, { status: 500 });
   }
@@ -25,13 +32,13 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { customerId, items, discount, tax, paidAmount, paymentMethod } = body;
 
-    if (!items || items.length === 0) {
+    if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: "No items in cart" }, { status: 400 });
     }
 
-    // Calculate totals
+    // Calculate totals with explicit typing
     let subtotal = 0;
-    const processedItems = items.map((item: any) => {
+    const processedItems = items.map((item: CartItem) => {
       const totalPrice = item.sellingPrice * item.quantity;
       subtotal += totalPrice;
       return {
@@ -109,7 +116,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(result, { status: 201 });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error processing checkout:", error);
     return NextResponse.json({ error: "Failed to process checkout" }, { status: 500 });
   }
