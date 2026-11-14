@@ -1,0 +1,91 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ================= PRODUCT & STOCK =================
+model Product {
+  id                String     @id @default(uuid())
+  barcode           String?    @unique
+  name              String
+  category          String     @default("General")
+  unit              String     @default("pcs") // pcs, kg, feet, meter, box, bag
+  costPrice         Float      @default(0.0)
+  sellingPrice      Float
+  stockQuantity     Float      @default(0.0)
+  minStockThreshold Float      @default(5.0)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  
+  saleItems         SaleItem[]
+}
+
+// ================= CUSTOMERS & KHAATA (CREDIT) =================
+model Customer {
+  id             String   @id @default(uuid())
+  name           String
+  phone          String?  @unique
+  address        String?
+  currentBalance Float    @default(0.0) // Positive = owes money to store
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  sales          Sale[]
+}
+
+// ================= SALES & INVOICES =================
+model Sale {
+  id            String     @id @default(uuid())
+  invoiceNumber String     @unique
+  customerId    String?
+  customer      Customer?  @relation(fields: [customerId], references: [id])
+  
+  subtotal      Float
+  discount      Float      @default(0.0)
+  tax           Float      @default(0.0)
+  grandTotal    Float
+  paidAmount    Float
+  dueAmount     Float      @default(0.0)
+  
+  paymentStatus String     @default("PAID") // PAID, PARTIAL, UNPAID
+  paymentMethod String     @default("CASH") // CASH, CARD, KHAATA, BANK
+  
+  items         SaleItem[]
+  createdAt     DateTime   @default(now())
+}
+
+model SaleItem {
+  id            String  @id @default(uuid())
+  saleId        String
+  sale          Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product @relation(fields: [productId], references: [id])
+  
+  quantity      Float
+  unitCostPrice Float
+  unitPrice     Float
+  totalPrice    Float
+}
+
+// ================= EXPENSES & LEDGER =================
+model Expense {
+  id          String   @id @default(uuid())
+  category    String   // Rent, Electricity, Tea/Food, Transport, Salary
+  amount      Float
+  description String?
+  date        DateTime @default(now())
+}
+
+// ================= AUTHENTICATION & USERS =================
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  role      String   @default("OWNER")
+  createdAt DateTime @default(now())
+}
