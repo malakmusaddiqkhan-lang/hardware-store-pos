@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
-import { Package, Plus, AlertTriangle, Search } from "lucide-react";
+import { Package, Plus, AlertTriangle, Search, RefreshCw, Trash2 } from "lucide-react";
 
 interface Product {
   id: string;
@@ -23,7 +23,16 @@ export default function InventoryPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
 
-  // Form state
+  // Restock modal state
+  const [restockProduct, setRestockProduct] = useState<Product | null>(null);
+  const [restockData, setRestockData] = useState({
+    quantity: "",
+    costPrice: "",
+    sellingPrice: "",
+  });
+  const [restocking, setRestocking] = useState(false);
+
+  // Add product form state
   const [formData, setFormData] = useState({
     name: "",
     category: "General",
@@ -35,7 +44,6 @@ export default function InventoryPage() {
     barcode: "",
   });
 
-  // Fetch products on load
   useEffect(() => {
     fetchProducts();
   }, []);
@@ -82,10 +90,78 @@ export default function InventoryPage() {
     }
   };
 
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (p.barcode && p.barcode.includes(searchQuery))
+  const openRestockModal = (product: Product) => {
+    setRestockProduct(product);
+    setRestockData({
+      quantity: "",
+      costPrice: product.costPrice.toString(),
+      sellingPrice: product.sellingPrice.toString(),
+    });
+  };
+
+  const handleRestockSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!restockProduct) return;
+
+    const addedQty = parseFloat(restockData.quantity);
+    if (!addedQty || addedQty <= 0) {
+      alert("Please enter a valid quantity to add.");
+      return;
+    }
+
+    setRestocking(true);
+    try {
+      const res = await fetch(`/api/products/${restockProduct.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          quantity: addedQty,
+          costPrice: restockData.costPrice !== "" ? parseFloat(restockData.costPrice) : restockProduct.costPrice,
+          sellingPrice: restockData.sellingPrice !== "" ? parseFloat(restockData.sellingPrice) : restockProduct.sellingPrice,
+        }),
+      });
+
+      if (res.ok) {
+        setRestockProduct(null);
+        setRestockData({ quantity: "", costPrice: "", sellingPrice: "" });
+        fetchProducts();
+      } else {
+        alert("Failed to restock item");
+      }
+    } catch (err) {
+      console.error("Error restocking product:", err);
+    } finally {
+      setRestocking(false);
+    }
+  };
+
+  const handleDeleteProduct = async (product: Product) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${product.name}"? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`/api/products/${product.id}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        fetchProducts();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || "Cannot delete this product (it may be linked to past sales).");
+      }
+    } catch (err) {
+      console.error("Error deleting product:", err);
+    }
+  };
+
+  const filteredProducts = products.filter(
+    (p) =>
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.barcode && p.barcode.includes(searchQuery))
   );
 
   return (
@@ -130,16 +206,17 @@ export default function InventoryPage() {
                   <th className="p-3.5 font-semibold">Selling Price</th>
                   <th className="p-3.5 font-semibold">Stock</th>
                   <th className="p-3.5 font-semibold">Status</th>
+                  <th className="p-3.5 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-12 text-slate-400">Loading inventory...</td>
+                    <td colSpan={7} className="text-center py-12 text-slate-400">Loading inventory...</td>
                   </tr>
                 ) : filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-12 text-slate-400">No products found. Click "Add New Item" to start.</td>
+                    <td colSpan={7} className="text-center py-12 text-slate-400">No products found. Click "Add New Item" to start.</td>
                   </tr>
                 ) : (
                   filteredProducts.map((p) => {
@@ -166,6 +243,26 @@ export default function InventoryPage() {
                             </span>
                           )}
                         </td>
+                        <td className="p-3.5 text-right">
+                          <div className="inline-flex items-center justify-end space-x-2">
+                            <button
+                              onClick={() => openRestockModal(p)}
+                              className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg transition-colors shadow-sm"
+                              title="Add more stock to this item"
+                            >
+                              <RefreshCw size={12} />
+                              <span>Restock</span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteProduct(p)}
+                              className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-medium rounded-lg transition-colors"
+                              title="Delete item"
+                            >
+                              <Trash2 size={12} />
+                              <span>Delete</span>
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     );
                   })
@@ -174,6 +271,87 @@ export default function InventoryPage() {
             </table>
           </div>
         </div>
+
+        {/* Restock Modal */}
+        {restockProduct && (
+          <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
+              <div className="flex justify-between items-center pb-4 mb-4 border-b border-slate-100">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Restock Item</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {restockProduct.name} (Current Stock: <span className="font-semibold text-slate-700">{restockProduct.stockQuantity} {restockProduct.unit}</span>)
+                  </p>
+                </div>
+                <button
+                  onClick={() => setRestockProduct(null)}
+                  className="text-slate-400 hover:text-slate-600 text-lg font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleRestockSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    Quantity to Add ({restockProduct.unit}) *
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    autoFocus
+                    placeholder="e.g. 50"
+                    value={restockData.quantity}
+                    onChange={(e) => setRestockData({ ...restockData, quantity: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 outline-none focus:border-emerald-600"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Cost Price (PKR)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={restockData.costPrice}
+                      onChange={(e) => setRestockData({ ...restockData, costPrice: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 outline-none focus:border-emerald-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Selling Price (PKR)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      required
+                      value={restockData.sellingPrice}
+                      onChange={(e) => setRestockData({ ...restockData, sellingPrice: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 outline-none focus:border-emerald-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-4 flex items-center justify-end space-x-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setRestockProduct(null)}
+                    className="px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={restocking}
+                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+                  >
+                    {restocking ? "Updating..." : "Add Stock"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Add Product Modal */}
         {showAddModal && (

@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
-import { DollarSign, Wallet, TrendingUp, AlertTriangle, ShoppingCart, ArrowRight, Receipt } from "lucide-react";
+import { DollarSign, Wallet, TrendingUp, AlertTriangle, ShoppingCart, ArrowRight, Receipt, Package } from "lucide-react";
 import Link from "next/link";
 
 interface Sale {
@@ -30,6 +30,7 @@ interface Customer {
 interface Product {
   id: string;
   stockQuantity: number;
+  costPrice: number;
 }
 
 interface Expense {
@@ -93,6 +94,12 @@ export default function DashboardPage() {
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
   const netProfit = grossProfit - totalExpenses;
 
+  // Total Inventory Purchasing Investment
+  const totalInventoryValue = products.reduce(
+    (sum, p) => sum + (p.costPrice || 0) * (p.stockQuantity || 0),
+    0
+  );
+
   const lowStockCount = products.filter((p) => p.stockQuantity <= 5).length;
   const recentSales = sales.slice(0, 5);
 
@@ -106,7 +113,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Live Stat Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
           {/* Today's Sales */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-3">
@@ -141,6 +148,18 @@ export default function DashboardPage() {
               {loading ? "..." : `PKR ${netProfit.toLocaleString()}`}
             </p>
             <span className="text-xs text-slate-400 mt-1 block">Gross profit minus expenses</span>
+          </div>
+
+          {/* Total Inventory Purchasing Value */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Inventory Cost</span>
+              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Package size={20} /></div>
+            </div>
+            <p className="text-2xl font-extrabold text-indigo-600">
+              {loading ? "..." : `PKR ${totalInventoryValue.toLocaleString()}`}
+            </p>
+            <span className="text-xs text-slate-400 mt-1 block">Purchasing value of all stock</span>
           </div>
 
           {/* Low Stock Items */}

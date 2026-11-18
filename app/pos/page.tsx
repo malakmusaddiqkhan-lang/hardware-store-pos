@@ -98,13 +98,21 @@ export default function POSPage() {
   const subtotal = cart.reduce((sum, item) => sum + item.sellingPrice * item.quantity, 0);
   const disc = parseFloat(discount) || 0;
   const grandTotal = Math.max(0, subtotal - disc);
-  const paid = parseFloat(paidAmount) || grandTotal;
+  
+  // For Khaata, default paid to 0 unless user types partial cash. For others, default to grandTotal.
+  const paid = paymentMethod === "KHAATA" 
+    ? (paidAmount === "" ? 0 : parseFloat(paidAmount) || 0)
+    : (paidAmount === "" ? grandTotal : parseFloat(paidAmount) || 0);
+
   const changeDue = Math.max(0, paid - grandTotal);
   const creditDue = Math.max(0, grandTotal - paid);
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0) return alert("Cart is empty");
+    if (paymentMethod === "KHAATA" && !selectedCustomerId) {
+      return alert("Please select a customer for Khataa sales");
+    }
 
     setLoading(true);
     try {
@@ -116,7 +124,7 @@ export default function POSPage() {
           items: cart,
           discount: disc,
           tax: 0,
-          paidAmount: paymentMethod === "KHAATA" ? 0 : paid,
+          paidAmount: paid,
           paymentMethod,
         }),
       });
@@ -129,6 +137,7 @@ export default function POSPage() {
         setSelectedCustomerId("");
         setDiscount("");
         setPaidAmount("");
+        setPaymentMethod("CASH");
         fetchData(); // refresh stock quantities
       } else {
         alert(data.error || "Checkout failed");
@@ -196,7 +205,7 @@ export default function POSPage() {
           </div>
 
           {/* Cart Items List */}
-          <div className="p-3 overflow-y-auto flex-1 divide-y divide-slate-100 max-h-[28vh]">
+          <div className="p-3 overflow-y-auto flex-1 divide-y divide-slate-100 max-h-[26vh]">
             {cart.length === 0 ? (
               <div className="text-center py-12 text-slate-400 text-sm">Cart is empty. Click items from the catalog to add.</div>
             ) : (
@@ -218,10 +227,10 @@ export default function POSPage() {
           </div>
 
           {/* Checkout Form Controls */}
-          <form onSubmit={handleCheckout} className="p-4 bg-slate-50 border-t border-slate-200 space-y-3 mt-auto">
+          <form onSubmit={handleCheckout} className="p-4 bg-slate-50 border-t border-slate-200 space-y-2.5 mt-auto">
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-[11px] font-medium text-slate-600 mb-1">Customer (Optional)</label>
+                <label className="block text-[11px] font-medium text-slate-600 mb-1">Customer {paymentMethod === "KHAATA" ? "*" : "(Optional)"}</label>
                 <select
                   value={selectedCustomerId}
                   onChange={(e) => setSelectedCustomerId(e.target.value)}
@@ -237,7 +246,10 @@ export default function POSPage() {
                 <label className="block text-[11px] font-medium text-slate-600 mb-1">Payment Method</label>
                 <select
                   value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  onChange={(e) => {
+                    setPaymentMethod(e.target.value);
+                    if (e.target.value !== "KHAATA") setPaidAmount("");
+                  }}
                   className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs text-slate-900 bg-white outline-none font-semibold text-blue-600"
                 >
                   <option value="CASH">CASH</option>
@@ -259,18 +271,18 @@ export default function POSPage() {
                   className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs text-slate-900 bg-white outline-none"
                 />
               </div>
-              {paymentMethod !== "KHAATA" && (
-                <div>
-                  <label className="block text-[11px] font-medium text-slate-600 mb-1">Cash Received (PKR)</label>
-                  <input
-                    type="number"
-                    placeholder={grandTotal.toString()}
-                    value={paidAmount}
-                    onChange={(e) => setPaidAmount(e.target.value)}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs text-slate-900 bg-white outline-none font-semibold"
-                  />
-                </div>
-              )}
+              <div>
+                <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                  {paymentMethod === "KHAATA" ? "Paid Now (Cash Spot)" : "Cash Received (PKR)"}
+                </label>
+                <input
+                  type="number"
+                  placeholder={paymentMethod === "KHAATA" ? "0 (Partial / Full)" : grandTotal.toString()}
+                  value={paidAmount}
+                  onChange={(e) => setPaidAmount(e.target.value)}
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs text-slate-900 bg-white outline-none font-semibold text-slate-900"
+                />
+              </div>
             </div>
 
             {/* Totals Summary */}
@@ -285,7 +297,7 @@ export default function POSPage() {
                   <span>- PKR {disc.toLocaleString()}</span>
                 </div>
               )}
-              <div className="flex justify-between font-bold text-slate-900 text-sm pt-1">
+              <div className="flex justify-between font-bold text-slate-900 text-sm pt-0.5">
                 <span>Grand Total:</span>
                 <span className="text-blue-600">PKR {grandTotal.toLocaleString()}</span>
               </div>
@@ -296,9 +308,9 @@ export default function POSPage() {
                 </div>
               )}
               {paymentMethod === "KHAATA" && (
-                <div className="flex justify-between font-semibold text-red-600">
-                  <span>Added to Khaata Due:</span>
-                  <span>PKR {grandTotal.toLocaleString()}</span>
+                <div className="flex justify-between font-semibold text-red-600 pt-0.5 border-t border-dashed border-slate-200">
+                  <span>Added to Khataa Due:</span>
+                  <span>PKR {creditDue.toLocaleString()}</span>
                 </div>
               )}
             </div>
@@ -306,9 +318,9 @@ export default function POSPage() {
             <button
               type="submit"
               disabled={loading || cart.length === 0}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-xl font-bold text-sm transition-colors shadow-sm flex items-center justify-center space-x-2"
+              className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-xl font-bold text-xs transition-colors shadow-sm flex items-center justify-center space-x-2"
             >
-              <CheckCircle size={18} />
+              <CheckCircle size={16} />
               <span>{loading ? "Processing..." : "Complete Sale & Print"}</span>
             </button>
           </form>
@@ -360,9 +372,15 @@ export default function POSPage() {
                 <span>Payment Method:</span>
                 <span className="font-semibold">{completedSale.paymentMethod}</span>
               </div>
+              {completedSale.paidAmount > 0 && (
+                <div className="flex justify-between text-emerald-600">
+                  <span>Paid Spot Cash:</span>
+                  <span>PKR {completedSale.paidAmount.toLocaleString()}</span>
+                </div>
+              )}
               {completedSale.dueAmount > 0 && (
                 <div className="flex justify-between text-red-600 font-bold">
-                  <span>Due Balance:</span>
+                  <span>Added to Khataa Due:</span>
                   <span>PKR {completedSale.dueAmount.toLocaleString()}</span>
                 </div>
               )}
@@ -401,8 +419,8 @@ export default function POSPage() {
                         `*Items:*\n` +
                         completedSale.items.map((i: any) => `- ${i.product.name} (${i.quantity} x ${i.unitPrice}) = PKR ${i.totalPrice}`).join('\n') +
                         `\n\n*Grand Total:* PKR ${completedSale.grandTotal.toLocaleString()}\n` +
-                        `*Payment:* ${completedSale.paymentMethod}\n` +
-                        (completedSale.dueAmount > 0 ? `*Due Balance:* PKR ${completedSale.dueAmount.toLocaleString()}\n` : ``) +
+                        `*Paid Spot Cash:* PKR ${completedSale.paidAmount.toLocaleString()}\n` +
+                        (completedSale.dueAmount > 0 ? `*Added to Khataa:* PKR ${completedSale.dueAmount.toLocaleString()}\n` : ``) +
                         `\nJazakallah Khair!`
                       );
 

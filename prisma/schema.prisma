@@ -10,32 +10,42 @@ datasource db {
 
 // ================= PRODUCT & STOCK =================
 model Product {
-  id                String     @id @default(uuid())
-  barcode           String?    @unique
+  id                String       @id @default(uuid())
+  barcode           String?      @unique
   name              String
-  category          String     @default("General")
-  unit              String     @default("pcs") // pcs, kg, feet, meter, box, bag
-  costPrice         Float      @default(0.0)
+  category          String       @default("General")
+  unit              String       @default("pcs") // pcs, kg, feet, meter, box, bag
+  costPrice         Float        @default(0.0)
   sellingPrice      Float
-  stockQuantity     Float      @default(0.0)
-  minStockThreshold Float      @default(5.0)
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
+  stockQuantity     Float        @default(0.0)
+  minStockThreshold Float        @default(5.0)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
   
   saleItems         SaleItem[]
 }
 
 // ================= CUSTOMERS & KHAATA (CREDIT) =================
 model Customer {
-  id             String   @id @default(uuid())
+  id             String            @id @default(uuid())
   name           String
-  phone          String?  @unique
+  phone          String?           @unique
   address        String?
-  currentBalance Float    @default(0.0) // Positive = owes money to store
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  currentBalance Float             @default(0.0) // Positive = owes money to store
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   sales          Sale[]
+  payments       CustomerPayment[]
+}
+
+model CustomerPayment {
+  id         String   @id @default(uuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  amount     Float
+  note       String?  @default("Khaata Payment Received")
+  createdAt  DateTime @default(now())
 }
 
 // ================= SALES & INVOICES =================

@@ -67,7 +67,7 @@ export default function AppLayout({
               className="w-11 h-11 rounded-full object-cover border-2 border-blue-500 shadow-md shrink-0"
             />
             <div>
-              <h1 className="font-bold text-sm tracking-wide leading-tight">HARDWARE POS</h1>
+              <h1 className="font-bold text-sm tracking-wide leading-tight">M Rasool Khan</h1>
               <p className="text-xs text-slate-400 capitalize">{userRole.toLowerCase()} Mode</p>
             </div>
           </div>

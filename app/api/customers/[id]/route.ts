@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-// GET: Fetch complete customer details, itemized sales history, and exact timestamps
+// GET: Fetch complete customer details, payment receipts, and itemized sales history
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -18,6 +18,9 @@ export async function GET(
     const customer = await db.customer.findUnique({
       where: { id },
       include: {
+        payments: {
+          orderBy: { createdAt: "desc" },
+        },
         sales: {
           orderBy: { createdAt: "desc" },
           include: {
@@ -42,7 +45,7 @@ export async function GET(
   }
 }
 
-// PATCH: Receive a partial or full Khaata payment (e.g., paying 545 out of 1,545)
+// PATCH: Receive a partial or full Khaata payment and log payment bill receipt
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -52,6 +55,7 @@ export async function PATCH(
     const id = resolvedParams.id;
     const body = await request.json();
     const paymentAmount = parseFloat(body.amount);
+    const note = body.note || "Khaata Payment Received";
 
     if (!id) {
       return NextResponse.json({ error: "Customer ID is required" }, { status: 400 });
@@ -72,17 +76,28 @@ export async function PATCH(
     // Prevent negative balance if they overpay slightly, or deduct cleanly
     const newBalance = Math.max(0, customer.currentBalance - paymentAmount);
 
-    const updatedCustomer = await db.customer.update({
-      where: { id },
-      data: {
-        currentBalance: newBalance,
-      },
-    });
+    // Update customer balance and create a payment receipt record atomically
+    const [updatedCustomer, paymentRecord] = await db.$transaction([
+      db.customer.update({
+        where: { id },
+        data: {
+          currentBalance: newBalance,
+        },
+      }),
+      db.customerPayment.create({
+        data: {
+          customerId: id,
+          amount: paymentAmount,
+          note: note,
+        },
+      }),
+    ]);
 
     return NextResponse.json(
       {
         success: true,
         customer: updatedCustomer,
+        payment: paymentRecord,
         paid: paymentAmount,
         remainingBalance: newBalance,
       },
@@ -94,7 +109,7 @@ export async function PATCH(
   }
 }
 
-// DELETE: Remove a customer and unlink related sales (Your existing working logic)
+// DELETE: Remove a customer and unlink related sales & payments
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -111,6 +126,11 @@ export async function DELETE(
     await db.sale.updateMany({
       where: { customerId: id },
       data: { customerId: null },
+    });
+
+    // Delete associated payment records
+    await db.customerPayment.deleteMany({
+      where: { customerId: id },
     });
 
     // Delete the customer
