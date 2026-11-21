@@ -332,8 +332,9 @@ export default function POSPage() {
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl text-slate-900">
             <div className="text-center pb-4 border-b border-dashed border-slate-300 space-y-1">
-              <h2 className="text-lg font-extrabold uppercase tracking-wide">Hardware Store POS</h2>
-              <p className="text-xs text-slate-500">Odigram Bazaar, Swat</p>
+              <h2 className="text-lg font-extrabold uppercase tracking-wide">M Rasool Khan</h2>
+              <p className="text-xs text-slate-500">Matta Road Ningolai Swat</p>
+              <p className="text-xs text-slate-500">Phone: +92 341 5307785</p>
               <p className="text-[11px] text-slate-400">Invoice: {completedSale.invoiceNumber}</p>
               <p className="text-[11px] text-slate-400">Date: {new Date(completedSale.createdAt).toLocaleString()}</p>
               {completedSale.customer && (
@@ -413,7 +414,8 @@ export default function POSPage() {
                   <button
                     onClick={() => {
                       const message = encodeURIComponent(
-                        `*HARDWARE STORE POS* - Odigram Bazaar, Swat\n` +
+                        `*M Rasool Khan* - Matta Road Ningolai Swat\n` +
+                        `Phone: +92 341 5307785\n` +
                         `Invoice: ${completedSale.invoiceNumber}\n` +
                         `Date: ${new Date(completedSale.createdAt).toLocaleString()}\n\n` +
                         `*Items:*\n` +
