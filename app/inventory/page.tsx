@@ -395,6 +395,10 @@ export default function InventoryPage() {
                     >
                       <option value="pcs">Pieces (pcs)</option>
                       <option value="kg">Kilograms (kg)</option>
+                      <option value="g">Grams (g)</option>
+                      <option value="100g">100 Grams (100g)</option>
+                      <option value="250g">250 Grams (250g)</option>
+                      <option value="500g">500 Grams (500g)</option>
                       <option value="feet">Feet</option>
                       <option value="meter">Meter</option>
                       <option value="box">Box</option>

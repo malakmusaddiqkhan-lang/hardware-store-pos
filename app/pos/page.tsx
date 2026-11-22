@@ -1,9 +1,9 @@
 // app/pos/page.tsx
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
-import { Search, ShoppingCart, Plus, Minus, Trash2, Printer, CheckCircle, User } from "lucide-react";
+import { Search, ShoppingCart, Trash2, Printer, CheckCircle } from "lucide-react";
 
 interface Product {
   id: string;
@@ -94,6 +94,10 @@ export default function POSPage() {
     setCart((prev) => prev.filter((item) => item.productId !== productId));
   };
 
+  // Selected customer & balances
+  const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
+  const previousBalance = selectedCustomer ? Number(selectedCustomer.currentBalance || 0) : 0;
+
   // Calculations
   const subtotal = cart.reduce((sum, item) => sum + item.sellingPrice * item.quantity, 0);
   const disc = parseFloat(discount) || 0;
@@ -106,6 +110,7 @@ export default function POSPage() {
 
   const changeDue = Math.max(0, paid - grandTotal);
   const creditDue = Math.max(0, grandTotal - paid);
+  const totalUpdatedKhaata = previousBalance + creditDue;
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,6 +118,9 @@ export default function POSPage() {
     if (paymentMethod === "KHAATA" && !selectedCustomerId) {
       return alert("Please select a customer for Khataa sales");
     }
+
+    // Capture customer's pre-sale balance before the sale updates it
+    const preSaleBalance = previousBalance;
 
     setLoading(true);
     try {
@@ -131,14 +139,19 @@ export default function POSPage() {
 
       const data = await res.json();
       if (res.ok) {
-        setCompletedSale(data);
+        const saleDue = Number(data.dueAmount ?? creditDue);
+        setCompletedSale({
+          ...data,
+          previousBalance: selectedCustomerId ? preSaleBalance : 0,
+          updatedTotalBalance: selectedCustomerId ? preSaleBalance + saleDue : 0,
+        });
         setShowReceiptModal(true);
         setCart([]);
         setSelectedCustomerId("");
         setDiscount("");
         setPaidAmount("");
         setPaymentMethod("CASH");
-        fetchData(); // refresh stock quantities
+        fetchData(); // refresh stock quantities & updated customer balances
       } else {
         alert(data.error || "Checkout failed");
       }
@@ -205,7 +218,7 @@ export default function POSPage() {
           </div>
 
           {/* Cart Items List */}
-          <div className="p-3 overflow-y-auto flex-1 divide-y divide-slate-100 max-h-[26vh]">
+          <div className="p-3 overflow-y-auto flex-1 divide-y divide-slate-100 max-h-[24vh]">
             {cart.length === 0 ? (
               <div className="text-center py-12 text-slate-400 text-sm">Cart is empty. Click items from the catalog to add.</div>
             ) : (
@@ -238,7 +251,9 @@ export default function POSPage() {
                 >
                   <option value="">Walk-in Customer</option>
                   {customers.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name} {c.phone ? `(${c.phone})` : ""}</option>
+                    <option key={c.id} value={c.id}>
+                      {c.name} {c.phone ? `(${c.phone})` : ""}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -288,18 +303,27 @@ export default function POSPage() {
             {/* Totals Summary */}
             <div className="pt-2 border-t border-slate-200 space-y-1 text-xs">
               <div className="flex justify-between text-slate-600">
-                <span>Subtotal:</span>
-                <span>PKR {subtotal.toLocaleString()}</span>
+                <span>Actual Price (Subtotal):</span>
+                <span className={disc > 0 ? "line-through text-slate-400" : ""}>
+                  PKR {subtotal.toLocaleString()}
+                </span>
               </div>
               {disc > 0 && (
-                <div className="flex justify-between text-emerald-600">
+                <div className="flex justify-between text-emerald-600 font-medium">
                   <span>Discount:</span>
                   <span>- PKR {disc.toLocaleString()}</span>
                 </div>
               )}
-              <div className="flex justify-between font-bold text-slate-900 text-sm pt-0.5">
-                <span>Grand Total:</span>
-                <span className="text-blue-600">PKR {grandTotal.toLocaleString()}</span>
+              <div className="flex justify-between font-bold text-slate-900 text-sm pt-0.5 items-baseline">
+                <span>{disc > 0 ? "After Discount Total:" : "Grand Total:"}</span>
+                <div className="flex items-center space-x-2">
+                  {disc > 0 && (
+                    <span className="text-xs font-medium line-through text-slate-400">
+                      PKR {subtotal.toLocaleString()}
+                    </span>
+                  )}
+                  <span className="text-blue-600">PKR {grandTotal.toLocaleString()}</span>
+                </div>
               </div>
               {paymentMethod !== "KHAATA" && paidAmount !== "" && (
                 <div className="flex justify-between font-semibold text-emerald-700">
@@ -311,6 +335,20 @@ export default function POSPage() {
                 <div className="flex justify-between font-semibold text-red-600 pt-0.5 border-t border-dashed border-slate-200">
                   <span>Added to Khataa Due:</span>
                   <span>PKR {creditDue.toLocaleString()}</span>
+                </div>
+              )}
+
+              {/* Previous & Updated Khaata Balance for Selected Customer */}
+              {selectedCustomer && (
+                <div className="mt-1.5 pt-1.5 border-t border-dashed border-slate-300 space-y-1 bg-amber-50/70 px-2 py-1.5 rounded-lg">
+                  <div className="flex justify-between text-amber-900 font-medium">
+                    <span>Previous Khaata Due:</span>
+                    <span>PKR {previousBalance.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-900 font-bold">
+                    <span>New Total Khaata Balance:</span>
+                    <span className="text-red-700">PKR {totalUpdatedKhaata.toLocaleString()}</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -356,8 +394,10 @@ export default function POSPage() {
 
             <div className="py-3 border-t border-dashed border-slate-300 space-y-1 text-xs">
               <div className="flex justify-between">
-                <span>Subtotal:</span>
-                <span>PKR {completedSale.subtotal.toLocaleString()}</span>
+                <span>Actual Price:</span>
+                <span className={completedSale.discount > 0 ? "line-through text-slate-400" : ""}>
+                  PKR {completedSale.subtotal.toLocaleString()}
+                </span>
               </div>
               {completedSale.discount > 0 && (
                 <div className="flex justify-between text-emerald-600">
@@ -365,9 +405,16 @@ export default function POSPage() {
                   <span>- PKR {completedSale.discount.toLocaleString()}</span>
                 </div>
               )}
-              <div className="flex justify-between font-extrabold text-sm pt-1">
-                <span>Grand Total:</span>
-                <span>PKR {completedSale.grandTotal.toLocaleString()}</span>
+              <div className="flex justify-between font-extrabold text-sm pt-1 items-baseline">
+                <span>{completedSale.discount > 0 ? "After Discount Total:" : "Grand Total:"}</span>
+                <div className="flex items-center space-x-2">
+                  {completedSale.discount > 0 && (
+                    <span className="text-xs font-medium line-through text-slate-400">
+                      PKR {completedSale.subtotal.toLocaleString()}
+                    </span>
+                  )}
+                  <span>PKR {completedSale.grandTotal.toLocaleString()}</span>
+                </div>
               </div>
               <div className="flex justify-between text-slate-600">
                 <span>Payment Method:</span>
@@ -383,6 +430,20 @@ export default function POSPage() {
                 <div className="flex justify-between text-red-600 font-bold">
                   <span>Added to Khataa Due:</span>
                   <span>PKR {completedSale.dueAmount.toLocaleString()}</span>
+                </div>
+              )}
+
+              {/* Previous & Total Khaata Balance on Printed Receipt */}
+              {completedSale.customer && (completedSale.previousBalance > 0 || completedSale.dueAmount > 0) && (
+                <div className="pt-2 mt-2 border-t border-dashed border-slate-300 space-y-1">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Previous Due Balance:</span>
+                    <span>PKR {Number(completedSale.previousBalance || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between font-extrabold text-slate-900 text-sm">
+                    <span>Total Khaata Balance:</span>
+                    <span>PKR {Number(completedSale.updatedTotalBalance || 0).toLocaleString()}</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -413,6 +474,7 @@ export default function POSPage() {
                 return (
                   <button
                     onClick={() => {
+                      const hasKhaataInfo = completedSale.customer && (completedSale.previousBalance > 0 || completedSale.dueAmount > 0);
                       const message = encodeURIComponent(
                         `*M Rasool Khan* - Matta Road Ningolai Swat\n` +
                         `Phone: +92 341 5307785\n` +
@@ -420,9 +482,18 @@ export default function POSPage() {
                         `Date: ${new Date(completedSale.createdAt).toLocaleString()}\n\n` +
                         `*Items:*\n` +
                         completedSale.items.map((i: any) => `- ${i.product.name} (${i.quantity} x ${i.unitPrice}) = PKR ${i.totalPrice}`).join('\n') +
-                        `\n\n*Grand Total:* PKR ${completedSale.grandTotal.toLocaleString()}\n` +
+                        `\n\n` +
+                        (completedSale.discount > 0
+                          ? `*Actual Price:* ~PKR ${completedSale.subtotal.toLocaleString()}~\n` +
+                            `*Discount:* -PKR ${completedSale.discount.toLocaleString()}\n` +
+                            `*After Discount Total:* PKR ${completedSale.grandTotal.toLocaleString()}\n`
+                          : `*Grand Total:* PKR ${completedSale.grandTotal.toLocaleString()}\n`) +
                         `*Paid Spot Cash:* PKR ${completedSale.paidAmount.toLocaleString()}\n` +
                         (completedSale.dueAmount > 0 ? `*Added to Khataa:* PKR ${completedSale.dueAmount.toLocaleString()}\n` : ``) +
+                        (hasKhaataInfo
+                          ? `*Previous Due Balance:* PKR ${Number(completedSale.previousBalance || 0).toLocaleString()}\n` +
+                            `*Total Khaata Balance:* PKR ${Number(completedSale.updatedTotalBalance || 0).toLocaleString()}\n`
+                          : ``) +
                         `\nJazakallah Khair!`
                       );
 
