@@ -75,6 +75,9 @@ export default function CustomersPage() {
   // Payment Receipt Print Modal State
   const [printingPayment, setPrintingPayment] = useState<PaymentRecord | null>(null);
 
+  // Purchase Invoice Bill Print Modal State
+  const [printingSale, setPrintingSale] = useState<SaleDetail | null>(null);
+
   // Add Customer Form state
   const [formData, setFormData] = useState({
     name: "",
@@ -523,11 +526,22 @@ export default function CustomersPage() {
                               <div className="font-bold text-slate-800">
                                 Invoice #{sale.invoiceNumber}
                               </div>
-                              <div className="inline-flex items-center gap-1.5 text-slate-600 font-medium bg-white px-2.5 py-1 rounded-md border border-slate-200">
-                                <Clock size={13} className="text-blue-600" />
-                                <span>
-                                  {formattedDate} at {formattedTime}
-                                </span>
+                              <div className="flex items-center gap-2">
+                                <div className="inline-flex items-center gap-1.5 text-slate-600 font-medium bg-white px-2.5 py-1 rounded-md border border-slate-200">
+                                  <Clock size={13} className="text-blue-600" />
+                                  <span>
+                                    {formattedDate} at {formattedTime}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setPrintingSale(sale)}
+                                  className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-md text-xs font-bold inline-flex items-center space-x-1 transition-colors shadow-xs"
+                                  title="Print this Khaata invoice bill"
+                                >
+                                  <Printer size={12} />
+                                  <span>Print Bill</span>
+                                </button>
                               </div>
                             </div>
 
@@ -617,6 +631,150 @@ export default function CustomersPage() {
                 >
                   Close Ledger
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Print Purchase Invoice Bill Modal */}
+        {printingSale && selectedCustomer && (
+          <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl text-slate-900 space-y-4">
+              {/* Store & Bill Header */}
+              <div className="text-center pb-3 border-b border-dashed border-slate-300 space-y-1">
+                <h2 className="text-base font-extrabold uppercase tracking-wide">M Rasool Khan</h2>
+                <p className="text-[11px] text-slate-500">Matta Road Ningolai Swat</p>
+                <p className="text-[11px] text-slate-500">Phone: +92 341 5307785</p>
+                <p className="text-[11px] font-semibold text-slate-700 pt-1">
+                  Invoice #{printingSale.invoiceNumber}
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Date: {new Date(printingSale.createdAt).toLocaleString()}
+                </p>
+                <p className="text-xs font-bold text-blue-600 pt-1">
+                  Customer: {selectedCustomer.name}
+                </p>
+              </div>
+
+              {/* Itemized Bill Rows */}
+              <div className="py-2 space-y-2 max-h-52 overflow-y-auto text-xs divide-y divide-slate-100">
+                {printingSale.items && printingSale.items.length > 0 ? (
+                  printingSale.items.map((item) => (
+                    <div key={item.id} className="pt-2 flex justify-between items-start">
+                      <div>
+                        <p className="font-semibold text-slate-800">
+                          {item.product?.name || "Hardware Item"}
+                        </p>
+                        <p className="text-[10px] text-slate-500">
+                          {item.quantity} {item.product?.unit || "pcs"} × PKR {item.unitPrice.toLocaleString()}
+                        </p>
+                      </div>
+                      <span className="font-bold text-slate-900">
+                        PKR {item.totalPrice.toLocaleString()}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-slate-400 italic text-center py-2">
+                    No itemized details recorded for this invoice.
+                  </p>
+                )}
+              </div>
+
+              {/* Bill Totals & Khaata Summary */}
+              <div className="py-3 border-t border-dashed border-slate-300 space-y-1 text-xs">
+                <div className="flex justify-between font-extrabold text-sm">
+                  <span>Bill Total:</span>
+                  <span>PKR {printingSale.grandTotal.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>Payment Method:</span>
+                  <span className="font-semibold">{printingSale.paymentMethod}</span>
+                </div>
+                <div className="flex justify-between text-emerald-600">
+                  <span>Paid at Sale:</span>
+                  <span>PKR {printingSale.paidAmount.toLocaleString()}</span>
+                </div>
+                {printingSale.dueAmount > 0 && (
+                  <div className="flex justify-between text-red-600 font-bold">
+                    <span>Added to Khaata:</span>
+                    <span>PKR {printingSale.dueAmount.toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-slate-800 pt-1.5 border-t border-dashed border-slate-200">
+                  <span>Remaining Khaata Due:</span>
+                  <span className={selectedCustomer.currentBalance > 0 ? "text-red-600" : "text-emerald-600"}>
+                    PKR {selectedCustomer.currentBalance.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-center text-[10px] text-slate-400 italic">
+                Jazakallah Khair! Thank you for your business.
+              </p>
+
+              {/* Print & Close Actions */}
+              <div className="flex flex-col space-y-2 pt-1">
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => window.print()}
+                    className="flex-1 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-colors"
+                  >
+                    <Printer size={14} />
+                    <span>Print Bill</span>
+                  </button>
+                  <button
+                    onClick={() => setPrintingSale(null)}
+                    className="px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                {selectedCustomer.phone && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const itemsText =
+                        printingSale.items && printingSale.items.length > 0
+                          ? printingSale.items
+                              .map(
+                                (i) =>
+                                  `- ${i.product?.name || "Hardware Item"} (${i.quantity} ${
+                                    i.product?.unit || "pcs"
+                                  } x ${i.unitPrice}) = PKR ${i.totalPrice.toLocaleString()}`
+                              )
+                              .join("\n")
+                          : "- Hardware Items";
+
+                      const message = encodeURIComponent(
+                        `*M Rasool Khan* - Matta Road Ningolai Swat\n` +
+                          `Phone: +92 341 5307785\n` +
+                          `Invoice: #${printingSale.invoiceNumber}\n` +
+                          `Customer: ${selectedCustomer.name}\n` +
+                          `Date: ${new Date(printingSale.createdAt).toLocaleString()}\n\n` +
+                          `*Items:*\n${itemsText}\n\n` +
+                          `*Bill Total:* PKR ${printingSale.grandTotal.toLocaleString()}\n` +
+                          `*Paid at Sale:* PKR ${printingSale.paidAmount.toLocaleString()}\n` +
+                          (printingSale.dueAmount > 0
+                            ? `*Added to Khaata:* PKR ${printingSale.dueAmount.toLocaleString()}\n`
+                            : ``) +
+                          `*Remaining Khaata Due:* PKR ${selectedCustomer.currentBalance.toLocaleString()}\n\n` +
+                          `Jazakallah Khair!`
+                      );
+
+                      let phoneClean = selectedCustomer.phone!.replace(/[^0-9]/g, "");
+                      if (phoneClean.startsWith("0")) {
+                        phoneClean = "92" + phoneClean.substring(1);
+                      }
+
+                      window.open(`https://wa.me/${phoneClean}?text=${message}`, "_blank");
+                    }}
+                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-colors shadow-xs"
+                  >
+                    <span>💬 Send Bill via WhatsApp</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -749,7 +907,7 @@ export default function CustomersPage() {
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Odigram Bazaar, Swat"
+                    placeholder="e.g. Matta Road Ningolai, Swat"
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 outline-none focus:border-blue-600"
