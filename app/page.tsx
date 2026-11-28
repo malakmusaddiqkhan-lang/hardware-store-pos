@@ -3,7 +3,18 @@
 
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
-import { DollarSign, Wallet, TrendingUp, AlertTriangle, ShoppingCart, ArrowRight, Receipt, Package } from "lucide-react";
+import {
+  DollarSign,
+  Wallet,
+  TrendingUp,
+  AlertTriangle,
+  ArrowRight,
+  Receipt,
+  Package,
+  CalendarDays,
+  CalendarRange,
+  Calendar,
+} from "lucide-react";
 import Link from "next/link";
 
 interface Sale {
@@ -35,6 +46,7 @@ interface Product {
 
 interface Expense {
   amount: number;
+  createdAt?: string;
 }
 
 export default function DashboardPage() {
@@ -75,6 +87,49 @@ export default function DashboardPage() {
     }
   };
 
+  // Helper to compute gross profit on a single sale
+  const getSaleGrossProfit = (sale: Sale) => {
+    const itemsCost = (sale.items || []).reduce(
+      (sum, item) => sum + (item.unitCostPrice || 0) * item.quantity,
+      0
+    );
+    return (sale.grandTotal || 0) - itemsCost;
+  };
+
+  // Date boundaries
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const sevenDaysAgo = new Date(startOfToday);
+  sevenDaysAgo.setDate(startOfToday.getDate() - 6); // Includes today + previous 6 days (7 days total)
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  // Daily Profit (Today)
+  const dailyGrossProfit = sales
+    .filter((s) => new Date(s.createdAt) >= startOfToday)
+    .reduce((sum, s) => sum + getSaleGrossProfit(s), 0);
+  const dailyExpenses = expenses
+    .filter((e) => e.createdAt && new Date(e.createdAt) >= startOfToday)
+    .reduce((sum, e) => sum + (e.amount || 0), 0);
+  const dailyProfit = dailyGrossProfit - dailyExpenses;
+
+  // Weekly Profit (Last 7 Days)
+  const weeklyGrossProfit = sales
+    .filter((s) => new Date(s.createdAt) >= sevenDaysAgo)
+    .reduce((sum, s) => sum + getSaleGrossProfit(s), 0);
+  const weeklyExpenses = expenses
+    .filter((e) => e.createdAt && new Date(e.createdAt) >= sevenDaysAgo)
+    .reduce((sum, e) => sum + (e.amount || 0), 0);
+  const weeklyProfit = weeklyGrossProfit - weeklyExpenses;
+
+  // Monthly Profit (Current Calendar Month)
+  const monthlyGrossProfit = sales
+    .filter((s) => new Date(s.createdAt) >= startOfMonth)
+    .reduce((sum, s) => sum + getSaleGrossProfit(s), 0);
+  const monthlyExpenses = expenses
+    .filter((e) => e.createdAt && new Date(e.createdAt) >= startOfMonth)
+    .reduce((sum, e) => sum + (e.amount || 0), 0);
+  const monthlyProfit = monthlyGrossProfit - monthlyExpenses;
+
   // Live Calculations
   const todaysSales = sales
     .filter((s) => todayStr && new Date(s.createdAt).toDateString() === todayStr)
@@ -83,7 +138,7 @@ export default function DashboardPage() {
   const totalPendingDues = customers.reduce((sum, c) => sum + (c.currentBalance || 0), 0);
   const activeAccountsCount = customers.filter((c) => (c.currentBalance || 0) > 0).length;
 
-  let totalRevenue = sales.reduce((sum, s) => sum + s.grandTotal, 0);
+  const totalRevenue = sales.reduce((sum, s) => sum + s.grandTotal, 0);
   let totalCost = 0;
   sales.forEach((sale) => {
     sale.items.forEach((item) => {
@@ -103,6 +158,11 @@ export default function DashboardPage() {
   const lowStockCount = products.filter((p) => p.stockQuantity <= 5).length;
   const recentSales = sales.slice(0, 5);
 
+  const currentMonthLabel = now.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+
   return (
     <AppLayout userRole="OWNER">
       <div>
@@ -113,7 +173,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Live Stat Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
           {/* Today's Sales */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-3">
@@ -172,6 +232,73 @@ export default function DashboardPage() {
               {loading ? "..." : `${lowStockCount} Items`}
             </p>
             <span className="text-xs text-slate-400 mt-1 block">Requires inventory restock</span>
+          </div>
+        </div>
+
+        {/* Daily, Weekly & Monthly Profit Record */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                Profit Record (Daily / Weekly / Monthly)
+              </h2>
+              <p className="text-xs text-slate-500">
+                Estimated profit based on sales minus item cost price and period expenses.
+              </p>
+            </div>
+            <span className="text-xs font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-full self-start sm:self-auto">
+              {currentMonthLabel}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Daily Profit */}
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 block">
+                  Daily Profit (Today)
+                </span>
+                <p className={`text-xl font-extrabold mt-1 ${dailyProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                  {loading ? "..." : `PKR ${dailyProfit.toLocaleString()}`}
+                </p>
+                <span className="text-[11px] text-slate-400 mt-0.5 block">Today&apos;s margin profit</span>
+              </div>
+              <div className="p-2.5 bg-emerald-100/70 text-emerald-700 rounded-xl shrink-0">
+                <CalendarDays size={20} />
+              </div>
+            </div>
+
+            {/* Weekly Profit */}
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 block">
+                  Weekly Profit (Last 7 Days)
+                </span>
+                <p className={`text-xl font-extrabold mt-1 ${weeklyProfit >= 0 ? "text-blue-600" : "text-red-600"}`}>
+                  {loading ? "..." : `PKR ${weeklyProfit.toLocaleString()}`}
+                </p>
+                <span className="text-[11px] text-slate-400 mt-0.5 block">Past 7 days cumulative profit</span>
+              </div>
+              <div className="p-2.5 bg-blue-100/70 text-blue-700 rounded-xl shrink-0">
+                <CalendarRange size={20} />
+              </div>
+            </div>
+
+            {/* Monthly Profit */}
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 block">
+                  Monthly Profit ({currentMonthLabel})
+                </span>
+                <p className={`text-xl font-extrabold mt-1 ${monthlyProfit >= 0 ? "text-indigo-600" : "text-red-600"}`}>
+                  {loading ? "..." : `PKR ${monthlyProfit.toLocaleString()}`}
+                </p>
+                <span className="text-[11px] text-slate-400 mt-0.5 block">Current month-to-date profit</span>
+              </div>
+              <div className="p-2.5 bg-indigo-100/70 text-indigo-700 rounded-xl shrink-0">
+                <Calendar size={20} />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -235,7 +362,7 @@ export default function DashboardPage() {
           {/* Quick Shortcuts */}
           <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col space-y-3">
             <h2 className="font-bold text-sm text-slate-900 mb-1">Quick Shortcuts</h2>
-            
+
             <Link
               href="/pos"
               className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center justify-between transition-colors shadow-sm"
