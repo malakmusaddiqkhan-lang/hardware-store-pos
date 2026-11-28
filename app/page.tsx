@@ -1,6 +1,9 @@
 // app/page.tsx
 "use client";
 
+// app/page.tsx
+"use client";
+
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import {
@@ -55,10 +58,10 @@ export default function DashboardPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
-  const [todayStr, setTodayStr] = useState("");
+  const [currentDate, setCurrentDate] = useState<Date | null>(null);
 
   useEffect(() => {
-    setTodayStr(new Date().toDateString());
+    setCurrentDate(new Date());
     fetchDashboardData();
   }, []);
 
@@ -96,38 +99,55 @@ export default function DashboardPage() {
     return (sale.grandTotal || 0) - itemsCost;
   };
 
-  // Date boundaries
-  const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const sevenDaysAgo = new Date(startOfToday);
-  sevenDaysAgo.setDate(startOfToday.getDate() - 6); // Includes today + previous 6 days (7 days total)
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  // Safe client-only date boundaries (prevents Next.js 16 prerender new Date() error)
+  const todayStr = currentDate ? currentDate.toDateString() : "";
+  const startOfToday = currentDate
+    ? new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate())
+    : null;
+  const sevenDaysAgo = startOfToday
+    ? new Date(startOfToday.getFullYear(), startOfToday.getMonth(), startOfToday.getDate() - 6)
+    : null;
+  const startOfMonth = currentDate
+    ? new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+    : null;
 
   // Daily Profit (Today)
-  const dailyGrossProfit = sales
-    .filter((s) => new Date(s.createdAt) >= startOfToday)
-    .reduce((sum, s) => sum + getSaleGrossProfit(s), 0);
-  const dailyExpenses = expenses
-    .filter((e) => e.createdAt && new Date(e.createdAt) >= startOfToday)
-    .reduce((sum, e) => sum + (e.amount || 0), 0);
+  const dailyGrossProfit = startOfToday
+    ? sales
+        .filter((s) => new Date(s.createdAt) >= startOfToday)
+        .reduce((sum, s) => sum + getSaleGrossProfit(s), 0)
+    : 0;
+  const dailyExpenses = startOfToday
+    ? expenses
+        .filter((e) => e.createdAt && new Date(e.createdAt) >= startOfToday)
+        .reduce((sum, e) => sum + (e.amount || 0), 0)
+    : 0;
   const dailyProfit = dailyGrossProfit - dailyExpenses;
 
   // Weekly Profit (Last 7 Days)
-  const weeklyGrossProfit = sales
-    .filter((s) => new Date(s.createdAt) >= sevenDaysAgo)
-    .reduce((sum, s) => sum + getSaleGrossProfit(s), 0);
-  const weeklyExpenses = expenses
-    .filter((e) => e.createdAt && new Date(e.createdAt) >= sevenDaysAgo)
-    .reduce((sum, e) => sum + (e.amount || 0), 0);
+  const weeklyGrossProfit = sevenDaysAgo
+    ? sales
+        .filter((s) => new Date(s.createdAt) >= sevenDaysAgo)
+        .reduce((sum, s) => sum + getSaleGrossProfit(s), 0)
+    : 0;
+  const weeklyExpenses = sevenDaysAgo
+    ? expenses
+        .filter((e) => e.createdAt && new Date(e.createdAt) >= sevenDaysAgo)
+        .reduce((sum, e) => sum + (e.amount || 0), 0)
+    : 0;
   const weeklyProfit = weeklyGrossProfit - weeklyExpenses;
 
   // Monthly Profit (Current Calendar Month)
-  const monthlyGrossProfit = sales
-    .filter((s) => new Date(s.createdAt) >= startOfMonth)
-    .reduce((sum, s) => sum + getSaleGrossProfit(s), 0);
-  const monthlyExpenses = expenses
-    .filter((e) => e.createdAt && new Date(e.createdAt) >= startOfMonth)
-    .reduce((sum, e) => sum + (e.amount || 0), 0);
+  const monthlyGrossProfit = startOfMonth
+    ? sales
+        .filter((s) => new Date(s.createdAt) >= startOfMonth)
+        .reduce((sum, s) => sum + getSaleGrossProfit(s), 0)
+    : 0;
+  const monthlyExpenses = startOfMonth
+    ? expenses
+        .filter((e) => e.createdAt && new Date(e.createdAt) >= startOfMonth)
+        .reduce((sum, e) => sum + (e.amount || 0), 0)
+    : 0;
   const monthlyProfit = monthlyGrossProfit - monthlyExpenses;
 
   // Live Calculations
@@ -158,10 +178,12 @@ export default function DashboardPage() {
   const lowStockCount = products.filter((p) => p.stockQuantity <= 5).length;
   const recentSales = sales.slice(0, 5);
 
-  const currentMonthLabel = now.toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-  });
+  const currentMonthLabel = currentDate
+    ? currentDate.toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      })
+    : "This Month";
 
   return (
     <AppLayout userRole="OWNER">
